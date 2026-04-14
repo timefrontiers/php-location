@@ -1,0 +1,45 @@
+{
+  "name": "timefrontiers/php-location",
+  "description": "Get visitor's location information from IP address with multiple provider support",
+  "keywords": ["php", "location", "geoip", "ip", "geolocation"],
+  "homepage": "https://github.com/timefrontiers/php-location",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Ikechukwu Okalia",
+      "email": "consult@ikechukwuokalia.dev",
+      "homepage": "https://ikechukwuokalia.dev",
+      "role": "developer"
+    },
+    {
+      "name": "Time Frontiers Ltd",
+      "email": "git@timefrontiers.com",
+      "homepage": "https://git.timefrontiers.com",
+      "role": "developer"
+    }
+  ],
+  "require": {
+    "php": ">=8.1"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.0"
+  },
+  "suggest": {
+    "ext-curl": "For better HTTP requests to GeoIP APIs",
+    "geoip2/geoip2": "For MaxMind GeoIP2 database support"
+  },
+  "autoload": {
+    "psr-4": {
+      "TimeFrontiers\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "TimeFrontiers\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit"
+  }
+}
