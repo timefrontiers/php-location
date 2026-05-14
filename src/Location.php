@@ -8,6 +8,8 @@ use TimeFrontiers\GeoIP\GeoIPInterface;
 use TimeFrontiers\GeoIP\IpApiService;
 use TimeFrontiers\GeoIP\LocationData;
 
+use function VibeSentry\get_constant;
+
 /**
  * Get visitor's location information from IP address.
  *
@@ -65,7 +67,7 @@ class Location {
       $this->currency_symbol = $data->currency_symbol;
       $this->latitude = $data->latitude;
       $this->longitude = $data->longitude;
-
+      $this->_dbLookup();
       return true;
     } catch (\Throwable $e) {
       $this->_addError('refresh', $e->getCode() ?: 500, $e->getMessage(), $e->getFile(), $e->getLine());
@@ -107,6 +109,66 @@ class Location {
     }
 
     return null;
+  }
+  /**
+   * Gets updates city_code, and state_code from db lookup.
+   */
+  private function _dbLookup(): void {
+    if (empty($this->state) && empty($this->city)) return;
+    global $database;
+    if (!$database || !$database instanceof SQLDatabase) return;
+    if (!\function_exists('TimeFrontiers\get_database') || !\function_exists('TimeFrontiers\get_constant')) return;
+    if (!$data_db = get_database(get_constant('PRJ_SERVER_NAME'), 'data')) return;
+    // ── State lookup ──────────────────────────────────────────────────────────
+    // Use fuzzy LIKE so partial/variant GeoIP region names still match.
+    // Narrow by country_code when available to avoid cross-country collisions.
+    if (!empty($this->state)) {
+      $state_name = '%' . \strtolower($this->state) . '%';
+      if (!empty($this->country_code)) {
+        $row = $database->fetchOne(
+          "SELECT `code` FROM `{$data_db}`.`states`
+           WHERE `country_code` = ? AND LOWER(`name`) LIKE ? LIMIT 1",
+          [$this->country_code, $state_name]
+        );
+      } else {
+        $row = $database->fetchOne(
+          "SELECT `code` FROM `{$data_db}`.`states`
+           WHERE LOWER(`name`) LIKE ? LIMIT 1",
+          [$state_name]
+        );
+      }
+      if ($row) $this->state_code = $row['code'];
+    }
+
+    // ── City lookup ───────────────────────────────────────────────────────────
+    if (!empty($this->city)) {
+      $city_name = '%' . \strtolower($this->city) . '%';
+      $city_row  = false; // isolated — must not bleed from state lookup above
+
+      if (!empty($this->state_code)) {
+        // Narrow to the resolved state.
+        $city_row = $database->fetchOne(
+          "SELECT `code` FROM `{$data_db}`.`cities`
+           WHERE `state_code` = ? AND LOWER(`name`) LIKE ? LIMIT 1",
+          [$this->state_code, $city_name]
+        );
+      } elseif (!empty($this->country_code)) {
+        // No state resolved — join through states filtered by country.
+        $city_row = $database->fetchOne(
+          "SELECT c.`code` FROM `{$data_db}`.`cities` AS c
+           JOIN `{$data_db}`.`states` AS s ON s.`code` = c.`state_code`
+           WHERE s.`country_code` = ? AND LOWER(c.`name`) LIKE ? LIMIT 1",
+          [$this->country_code, $city_name]
+        );
+      } else {
+        $city_row = $database->fetchOne(
+          "SELECT `code` FROM `{$data_db}`.`cities`
+           WHERE LOWER(`name`) LIKE ? LIMIT 1",
+          [$city_name]
+        );
+      }
+      if ($city_row) $this->city_code = $city_row['code'];
+    }
   }
 
   /**
