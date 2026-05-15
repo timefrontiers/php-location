@@ -127,13 +127,13 @@ class Location {
       if (!empty($this->country_code)) {
         $row = $database->fetchOne(
           "SELECT `code` FROM `{$data_db}`.`states`
-           WHERE `country_code` = ? AND LOWER(`name`) LIKE ? LIMIT 1",
+          WHERE `country_code` = ? AND LOWER(`name`) LIKE ? LIMIT 1",
           [$this->country_code, $state_name]
         );
       } else {
         $row = $database->fetchOne(
           "SELECT `code` FROM `{$data_db}`.`states`
-           WHERE LOWER(`name`) LIKE ? LIMIT 1",
+          WHERE LOWER(`name`) LIKE ? LIMIT 1",
           [$state_name]
         );
       }
@@ -149,21 +149,21 @@ class Location {
         // Narrow to the resolved state.
         $city_row = $database->fetchOne(
           "SELECT `code` FROM `{$data_db}`.`cities`
-           WHERE `state_code` = ? AND LOWER(`name`) LIKE ? LIMIT 1",
+          WHERE `state_code` = ? AND LOWER(`name`) LIKE ? LIMIT 1",
           [$this->state_code, $city_name]
         );
       } elseif (!empty($this->country_code)) {
         // No state resolved — join through states filtered by country.
         $city_row = $database->fetchOne(
           "SELECT c.`code` FROM `{$data_db}`.`cities` AS c
-           JOIN `{$data_db}`.`states` AS s ON s.`code` = c.`state_code`
-           WHERE s.`country_code` = ? AND LOWER(c.`name`) LIKE ? LIMIT 1",
+            JOIN `{$data_db}`.`states` AS s ON s.`code` = c.`state_code`
+          WHERE s.`country_code` = ? AND LOWER(c.`name`) LIKE ? LIMIT 1",
           [$this->country_code, $city_name]
         );
       } else {
         $city_row = $database->fetchOne(
           "SELECT `code` FROM `{$data_db}`.`cities`
-           WHERE LOWER(`name`) LIKE ? LIMIT 1",
+          WHERE LOWER(`name`) LIKE ? LIMIT 1",
           [$city_name]
         );
       }
