@@ -22,7 +22,7 @@ class Location {
   public string $state;
   public ?string $state_code = null;
   public string $country;
-  public string $country_code;
+  public ?string $country_code;
   public string $currency_code;
   public string $currency_symbol;
   public float $latitude;
