@@ -1,161 +1,167 @@
 # TimeFrontiers PHP Location
 
-A modern, flexible PHP library to retrieve visitor location information from IP address with support for multiple GeoIP providers.
+Explicit, privacy-aware IP geolocation for PHP 8.5 applications. Construction
+never sends a network request, forwarding headers are never trusted by default,
+and provider results are returned as complete immutable snapshots.
 
-[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.1-8892BF.svg)](https://php.net/)
+[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.5-8892BF.svg)](https://php.net/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Features
+## Requirements
 
-- **Multiple GeoIP provider support** via interface – easily switch between services.
-- **Built-in free provider** using ip-api.com (no API key required).
-- **Currency symbol mapping** for over 100 currencies.
-- **Client IP auto-detection** from common server headers.
-- **Error collection** with access‑based filtering via `InstanceError`.
-- **Strict typing and modern PHP** (8.1+).
-- **PSR‑4 autoloading**.
-
-## Installation
+- PHP 8.5+
+- ext-json
+- ext-curl only when using the supplied `CurlHttpTransport`
+- `geoip2/geoip2` only when using `MaxMindService::fromDatabase()`
 
 ```bash
 composer require timefrontiers/php-location
 ```
 
-## Requirements
+## Explicit lookup
 
-- PHP 8.1 or higher
-- [timefrontiers/php-instance-error](https://github.com/timefrontiers/php-instance-error) ^1.0 (optional, for error display)
-
-## Basic Usage
-
-### Quick Start
+Inject a configured provider, then call `locate()` explicitly. Creating the
+provider or lookup object has no network side effect.
 
 ```php
-use TimeFrontiers\Location;
+use TimeFrontiers\GeoIP\LocationLookup;
+use TimeFrontiers\GeoIP\MaxMindService;
 
-$location = new Location();
+$lookup = new LocationLookup(
+    MaxMindService::fromDatabase('/run/geoip/GeoLite2-City.mmdb'),
+);
 
-echo $location->ip;              // 123.45.67.89
-echo $location->city;            // Lagos
-echo $location->state;           // Lagos
-echo $location->country;         // Nigeria
-echo $location->country_code;    // NG
-echo $location->currency_code;   // NGN
-echo $location->currency_symbol; // ₦
-echo $location->latitude;        // 6.4474
-echo $location->longitude;       // 3.3903
+$location = $lookup->locate('8.8.8.8');
+echo $location->country_code;
 ```
 
-### Specify an IP Address
+If no IP is supplied, the default resolver reads only `REMOTE_ADDR`. It ignores
+`Forwarded`, `X-Forwarded-For`, `X-Real-IP`, and every other forwarding header.
+A host behind a trusted proxy must inject a `ClientIpResolverInterface` whose
+implementation has already applied that host's trusted-proxy policy.
 
-```php
-$location = new Location('8.8.8.8');
-echo $location->city; // Mountain View
-```
+Public lookup uses explicit snapshots of the current IANA IPv4/IPv6 special-
+purpose and IPv6 allocated-global-unicast registries. It accepts a special
+range only when IANA marks global reachability affirmatively true; false,
+blank, conditional, and N/A ranges fail closed. Longest-prefix decisions retain
+the affirmative anycast allocations inside broader reserved blocks. IPv4-
+mapped/compatible, 6to4, TEREDO, private-embedded NAT64, unallocated, multicast,
+documentation, link-local, loopback, and reserved forms are rejected before
+calling the provider. A local database or application-owned resolver may deliberately inject
+`IpAddressPolicy::allowNonPublic()`; public remote services such as
+`IpApiService` still enforce public addresses at their own boundary.
 
-### Refresh Location
+The embedded registry snapshot is dated 2025-10-09/10. Review it against the
+[IANA IPv4 special-purpose registry](https://www.iana.org/assignments/iana-ipv4-special-registry),
+[IANA IPv6 special-purpose registry](https://www.iana.org/assignments/iana-ipv6-special-registry),
+and [IANA IPv6 global-unicast registry](https://www.iana.org/assignments/ipv6-unicast-address-assignments)
+before each release. Registry drift must fail closed and receive corpus tests.
 
-```php
-$location = new Location();
-// Later...
-$location->refresh('1.1.1.1');
-```
+## Bounded HTTPS JSON provider
 
-## Error Handling
-
-Errors are stored in a protected `$_errors` property and can be retrieved with `getErrors()`. Use the `InstanceError` package to filter errors based on user rank.
-
-```php
-use TimeFrontiers\Location;
-use TimeFrontiers\InstanceError;
-
-$location = new Location('invalid-ip');
-
-if (!$location->refresh()) {
-    $errors = (new InstanceError($location, false))->get();
-    foreach ($errors['refresh'] as $error) {
-        echo $error[2]; // Error message
-    }
-}
-```
-
-## GeoIP Providers
-
-### Default: ip-api.com (free)
-
-The library uses ip-api.com by default with no API key required. Free tier limit: 45 requests per minute.
-
-```php
-$location = new Location(); // Uses ip-api.com
-```
-
-### Using a Commercial ip-api.com Key
+`IpApiService` is an adapter for the ip-api JSON response shape or a compatible
+application gateway. It requires an injected transport and an explicit HTTPS
+endpoint.
 
 ```php
 use TimeFrontiers\GeoIP\IpApiService;
+use TimeFrontiers\GeoIP\LocationLookup;
+use TimeFrontiers\Transport\CurlHttpTransport;
+use TimeFrontiers\Transport\HttpRequestOptions;
 
-$service = new IpApiService('your-api-key');
-$location = new Location(null, $service);
+$transport = new CurlHttpTransport(['geo.example.com']);
+$provider = new IpApiService(
+    transport: $transport,
+    endpoint: 'https://geo.example.com/ip-api-json',
+    authorization: 'Bearer ' . $_ENV['GEO_GATEWAY_TOKEN'],
+    options: new HttpRequestOptions(
+        connectTimeoutMilliseconds: 750,
+        totalTimeoutMilliseconds: 2500,
+        maximumResponseBytes: 32768,
+    ),
+);
+
+$location = (new LocationLookup($provider))->locate('1.1.1.1');
 ```
 
-### Creating a Custom Provider
+The supplied cURL transport permits HTTPS only, verifies TLS, disables
+redirects, requires an exact host allowlist, rejects private/reserved DNS
+answers, pins the approved DNS result for the request, bounds connect/total
+timeouts, and aborts oversized responses. It explicitly disables `HTTPS_PROXY`,
+`ALL_PROXY`, and every other ambient libcurl proxy through handle options, so
+validated DNS pinning always describes the direct path. Proxying is not a
+feature of this transport; an application that needs it must supply a separate
+transport with an explicit proxy allowlist, TLS, authentication, resolution,
+and redaction policy. `IpApiService` additionally requires
+HTTP 200 JSON, validates every consumed field and coordinate, and verifies that
+the response describes the requested IP.
 
-Implement the `GeoIPInterface` and pass it to the constructor.
+The public ip-api free endpoint is intentionally unsupported because it is
+HTTP-only and disallows commercial use. Direct ip-api pro authentication is
+also not built in because its key is a GET parameter; v1.1 never puts secrets
+in URLs. Use an application-owned HTTPS gateway that accepts an authorization
+header, or inject another `GeoIPInterface` implementation. Authorization is
+redacted from debug state and provider objects cannot be serialized.
+
+## Host enrichment
+
+This package contains no Linktude globals, SQL, schemas, or database dependency.
+Applications that need their own city/state codes may inject a
+`LocationDataEnricherInterface`. An enricher receives a complete immutable
+snapshot and must return another one, for example with `withHostCodes()`.
+Database implementations remain in the host and must use prepared,
+deterministic queries, distinguish database failure from no match, and escape
+wildcards if fuzzy matching is deliberately retained.
+
+## MaxMind
+
+`MaxMindService` accepts the narrow `MaxMindReaderInterface`; use
+`fromDatabase()` when `geoip2/geoip2` is installed. Capability, path readability,
+record shape, and coordinate ranges are validated. Raw MaxMind exceptions and
+database paths are not copied into public errors.
+
+## Legacy `Location` adapter
+
+`TimeFrontiers\Location` and `refresh()` remain deprecated migration adapters.
+Construction no longer performs a lookup. Every public property starts with a
+safe value, and `refresh()` assigns a complete validated snapshot only after
+lookup and enrichment succeed. Failure preserves the previous snapshot and
+records only a safe message with blank file/line fields.
 
 ```php
-use TimeFrontiers\GeoIP\GeoIPInterface;
-use TimeFrontiers\GeoIP\LocationData;
-use TimeFrontiers\Location;
-
-class MyProvider implements GeoIPInterface
-{
-    public function locate(string $ip): LocationData
-    {
-        // Fetch from your API
-        return new LocationData(
-            ip: $ip,
-            city: '...',
-            region: '...',
-            country: '...',
-            country_code: '...',
-            currency_code: '...',
-            currency_symbol: '...',
-            latitude: 0.0,
-            longitude: 0.0
-        );
-    }
-}
-
-$location = new Location(null, new MyProvider());
+$legacy = new \TimeFrontiers\Location('8.8.8.8', $provider);
+$legacy->refresh();
+echo $legacy->country_code;
 ```
 
-## Currency Symbols
+Prefer `LocationLookup::locate()` and immutable `LocationData` in new code.
 
-The library includes a static map of over 100 currency codes to symbols (`CurrencySymbols::get('USD') // '$'`). If a code is not found, the code itself is returned.
+## Currency symbols
 
-## Available Properties
+`CurrencySymbols::get()` normalizes a code to uppercase and returns a
+display-only symbol hint. Unknown codes return the normalized code. It is not an
+ISO currency authority and must not decide settlement currency or money rules.
 
-| Property           | Type    | Description                              |
-|--------------------|---------|------------------------------------------|
-| `$ip`              | string  | IP address used                          |
-| `$city`            | string  | City name                                |
-| `$city_code`       | ?string | Reserved for future use (currently null) |
-| `$state`           | string  | Region/state name                        |
-| `$state_code`      | ?string | Reserved for future use (currently null) |
-| `$country`         | string  | Country name                             |
-| `$country_code`    | string  | Two‑letter country code                  |
-| `$currency_code`   | string  | Three‑letter currency code               |
-| `$currency_symbol` | string  | Currency symbol (e.g. $, €, ₦)           |
-| `$latitude`        | float   | Latitude                                 |
-| `$longitude`       | float   | Longitude                                |
+## Privacy and retention
 
-## Security Considerations
+An IP address is personal data in many jurisdictions. Before enabling remote
+lookup, the application owner must document the lawful basis or consent,
+specific purpose, provider/subprocessor, disclosed fields, geographic
+precision, cache lifetime, retention period, deletion process, and user notice.
 
-- IP addresses are never stored locally; they are sent to the configured GeoIP provider.
-- When using a free service, be aware of rate limits and privacy policies.
-- Client IP detection respects proxy headers; ensure your application is configured securely.
+The package provides no cache or persistence by default. Minimize precision and
+retention, do not log requested IPs, provider bodies, authorization, or exact
+coordinates unless the documented purpose requires them, and never reuse
+location collected for one purpose in an unrelated decision.
+
+## Quality gates
+
+```bash
+composer validate --strict
+composer audit
+composer check
+```
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
-```
+[MIT License](LICENSE)

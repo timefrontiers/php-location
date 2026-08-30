@@ -6,10 +6,11 @@ namespace TimeFrontiers\GeoIP;
 
 interface GeoIPInterface {
   /**
-   * Locate an IP address and return location data.
+   * Explicitly locate one already-normalized IP address.
    *
-   * @param string $ip The IP address to locate.
-   * @return LocationData
+   * Implementations must return a complete snapshot for the requested IP and
+   * must not disclose provider details through public failures.
+   *
    * @throws \TimeFrontiers\LocationException
    */
   public function locate(string $ip): LocationData;
