@@ -38,6 +38,35 @@ final class IpApiServiceTest extends TestCase {
     self::assertSame('8.8.8.8', $result->ip);
     self::assertSame('US', $result->country_code);
     self::assertSame('$', $result->currency_symbol);
+    self::assertSame('North America', $result->continent);
+    self::assertSame('NA', $result->continent_code);
+    $queryString = \parse_url($transport->url, PHP_URL_QUERY);
+    self::assertIsString($queryString);
+    $query = [];
+    \parse_str($queryString, $query);
+    $fieldsValue = $query['fields'] ?? '';
+    self::assertIsString($fieldsValue);
+    $fields = \explode(',', $fieldsValue);
+    self::assertContains('continent', $fields);
+    self::assertContains('continentCode', $fields);
+  }
+
+  public function testMissingContinentFieldsRemainEmptyWithoutChangingCurrency():void {
+    $payload = self::payload();
+    unset($payload['continent'], $payload['continentCode']);
+    $service = new IpApiService(
+      new FakeTransport(new HttpResponse(
+        200,
+        'application/json',
+        \json_encode($payload, JSON_THROW_ON_ERROR)
+      )),
+      'https://geo.example.test/json'
+    );
+    $result = $service->locate('8.8.8.8');
+    self::assertSame('', $result->continent);
+    self::assertSame('', $result->continent_code);
+    self::assertSame('USD', $result->currency_code);
+    self::assertSame('$', $result->currency_symbol);
   }
 
   public function testPlaintextOrCredentialBearingEndpointsAreRejected():void {
@@ -81,6 +110,8 @@ final class IpApiServiceTest extends TestCase {
     yield 'mismatched IP' => [200, 'application/json', [...self::payload(), 'query' => '1.1.1.1']];
     yield 'string coordinate' => [200, 'application/json', [...self::payload(), 'lat' => '37.4']];
     yield 'invalid country code' => [200, 'application/json', [...self::payload(), 'countryCode' => 'USA']];
+    yield 'unknown continent code' => [200, 'application/json', [...self::payload(), 'continentCode' => 'XX']];
+    yield 'malformed continent code' => [200, 'application/json', [...self::payload(), 'continentCode' => 'AFRICA']];
   }
 
   public function testOversizedResponseFailsEvenWithACustomTransport():void {
@@ -162,6 +193,8 @@ final class IpApiServiceTest extends TestCase {
       'country' => 'United States',
       'countryCode' => 'us',
       'currency' => 'usd',
+      'continent' => 'North America',
+      'continentCode' => 'na',
       'lat' => 37.4056,
       'lon' => -122.0775,
     ];

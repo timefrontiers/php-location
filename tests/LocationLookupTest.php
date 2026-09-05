@@ -81,7 +81,9 @@ final class LocationLookupTest extends TestCase {
   }
 
   public function testHostEnrichmentIsInjectedAndReturnsANewCompleteSnapshot():void {
-    $provider = new FakeGeoIp(static fn (string $ip) => LocationFixture::forIp($ip));
+    $provider = new FakeGeoIp(
+      static fn (string $ip) => LocationFixture::forIp($ip, continent: 'North America', continentCode: 'NA')
+    );
     $enricher = new class implements LocationDataEnricherInterface {
       public function enrich(\TimeFrontiers\GeoIP\LocationData $location):\TimeFrontiers\GeoIP\LocationData {
         return $location->withHostCodes('LNK-CITY', 'LNK-STATE');
@@ -90,5 +92,8 @@ final class LocationLookupTest extends TestCase {
     $result = (new LocationLookup($provider, enricher: $enricher))->locate('8.8.8.8');
     self::assertSame('LNK-CITY', $result->city_code);
     self::assertSame('LNK-STATE', $result->region_code);
+    self::assertSame('North America', $result->continent);
+    self::assertSame('NA', $result->continent_code);
+    self::assertSame('USD', $result->currency_code);
   }
 }

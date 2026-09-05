@@ -23,6 +23,23 @@ final class MaxMindAndCurrencyTest extends TestCase {
     self::assertSame('Lagos', $data->city);
     self::assertSame('NG', $data->country_code);
     self::assertSame('', $data->currency_code);
+    self::assertSame('', $data->continent);
+    self::assertSame('', $data->continent_code);
+  }
+
+  public function testMaxMindAdapterReturnsProviderContinentWithoutInferringCurrency():void {
+    $reader = new FakeMaxMindReader(static fn ():object => (object)[
+      'city' => (object)['name' => 'Lagos'],
+      'mostSpecificSubdivision' => (object)['name' => 'Lagos'],
+      'country' => (object)['name' => 'Nigeria', 'isoCode' => 'NG'],
+      'continent' => (object)['name' => 'Africa', 'code' => 'af'],
+      'location' => (object)['latitude' => 6.455, 'longitude' => 3.384],
+    ]);
+    $data = (new MaxMindService($reader))->locate('196.6.103.73');
+    self::assertSame('Africa', $data->continent);
+    self::assertSame('AF', $data->continent_code);
+    self::assertSame('', $data->currency_code);
+    self::assertSame('', $data->currency_symbol);
   }
 
   public function testMaxMindFailuresAreRedactedAtAdapterBoundary():void {

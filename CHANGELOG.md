@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.0 - 2026-09-05
+
+### Added
+
+- Provider-supplied `continent` and `continent_code` on immutable
+  `LocationData`, with canonical codes `AF`, `AN`, `AS`, `EU`, `NA`, `OC`, and
+  `SA`. Empty values remain valid for custom providers that cannot supply them.
+- `IpApiService` requests `continent` and `continentCode` and validates them
+  through the existing bounded decoding path.
+- `MaxMindService` copies continent name and code from the reader continent
+  object when present and otherwise leaves them empty.
+- Legacy `Location` adapter properties `continent` and `continent_code`.
+
+### Changed
+
+- `withHostCodes()` preserves continent fields on the returned snapshot.
+
+### Notes
+
+- Continent is geographic data only. This release does not derive, recommend,
+  or select a currency. Existing currency fields are unchanged.
+
 ## 1.1.0 - 2026-08-30
 
 ### Added

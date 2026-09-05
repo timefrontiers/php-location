@@ -14,7 +14,7 @@ use TimeFrontiers\Transport\HttpTransportInterface;
 /** Explicit HTTPS adapter for the ip-api JSON schema or a compatible gateway. */
 final readonly class IpApiService implements GeoIPInterface {
 
-  private const FIELDS = 'status,country,countryCode,regionName,city,lat,lon,currency,query';
+  private const FIELDS = 'status,country,countryCode,regionName,city,lat,lon,currency,query,continent,continentCode';
 
   private HttpRequestOptions $options;
   private ?\SensitiveParameterValue $authorization;
@@ -93,7 +93,9 @@ final readonly class IpApiService implements GeoIPInterface {
       currency_code: $currency,
       currency_symbol: CurrencySymbols::get($currency),
       latitude: self::coordinate($data, 'lat'),
-      longitude: self::coordinate($data, 'lon')
+      longitude: self::coordinate($data, 'lon'),
+      continent: self::optionalString($data, 'continent', 160),
+      continent_code: self::optionalCode($data, 'continentCode', 2)
     );
   }
 

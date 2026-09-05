@@ -26,6 +26,8 @@ class Location {
   public ?string $state_code = null;
   public string $country = '';
   public ?string $country_code = null;
+  public string $continent = '';
+  public ?string $continent_code = null;
   public string $currency_code = '';
   public string $currency_symbol = '';
   public float $latitude = 0.0;
@@ -89,6 +91,8 @@ class Location {
     $this->state_code = $data->region_code;
     $this->country = $data->country;
     $this->country_code = $data->country_code !== '' ? $data->country_code : null;
+    $this->continent = $data->continent;
+    $this->continent_code = $data->continent_code !== '' ? $data->continent_code : null;
     $this->currency_code = $data->currency_code;
     $this->currency_symbol = $data->currency_symbol;
     $this->latitude = $data->latitude;

@@ -1,5 +1,44 @@
 # Upgrading PHP-Location
 
+## From 1.1.x to 1.2.x
+
+PHP-Location 1.2 adds provider-supplied continent name and code to the same
+explicit lookup. Construction still performs no provider or network call.
+
+### Read continent from the existing snapshot
+
+```php
+$location = $lookup->locate($trustedClientIp);
+
+$location->continent;       // Africa
+$location->continent_code;  // AF
+$location->country;         // Nigeria
+$location->country_code;    // NG
+```
+
+Canonical continent codes are `AF`, `AN`, `AS`, `EU`, `NA`, `OC`, and `SA`.
+Unknown nonempty codes fail closed. Custom `GeoIPInterface` implementations may
+leave both fields empty; the package does not maintain a hidden
+country-to-continent table.
+
+Existing positional and named `LocationData` construction remains valid. The
+new arguments are optional and appended after `city_code` and `region_code`.
+`withHostCodes()` retains continent data. `GeoIPInterface::locate()` is
+unchanged.
+
+### Continent is not currency policy
+
+Existing `currency_code` and `currency_symbol` fields are not removed or made
+mandatory. Do not use them, or continent, as a currency recommendation. Helper
+and other consumers must apply their own configured currency mapping.
+
+### Legacy adapter
+
+Deprecated `TimeFrontiers\Location` adds initialized `continent` (`''`) and
+`continent_code` (`null`). Values are copied only after a successful
+`refresh()`. A failed refresh preserves the previous snapshot, including
+continent. Prefer `LocationLookup::locate()`.
+
 ## From 1.0.x to 1.1.x
 
 PHP-Location 1.1 requires PHP 8.5 and changes lookup from an implicit constructor

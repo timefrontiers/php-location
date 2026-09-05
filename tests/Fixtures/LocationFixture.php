@@ -7,7 +7,12 @@ namespace TimeFrontiers\Tests\Fixtures;
 use TimeFrontiers\GeoIP\LocationData;
 
 final class LocationFixture {
-  public static function forIp(string $ip, string $city = 'Mountain View'):LocationData {
+  public static function forIp(
+    string $ip,
+    string $city = 'Mountain View',
+    string $continent = '',
+    string $continentCode = ''
+  ):LocationData {
     return new LocationData(
       ip: $ip,
       city: $city,
@@ -17,7 +22,9 @@ final class LocationFixture {
       currency_code: 'USD',
       currency_symbol: '$',
       latitude: 37.4056,
-      longitude: -122.0775
+      longitude: -122.0775,
+      continent: $continent,
+      continent_code: $continentCode
     );
   }
 }

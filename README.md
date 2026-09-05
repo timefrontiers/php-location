@@ -31,9 +31,20 @@ $lookup = new LocationLookup(
     MaxMindService::fromDatabase('/run/geoip/GeoLite2-City.mmdb'),
 );
 
-$location = $lookup->locate('8.8.8.8');
-echo $location->country_code;
+$location = $lookup->locate($trustedClientIp);
+echo $location->continent;       // Africa
+echo $location->continent_code;  // AF
+echo $location->country;         // Nigeria
+echo $location->country_code;    // NG
 ```
+
+`LocationData` exposes provider-supplied continent name and code alongside
+country. Canonical continent codes are `AF`, `AN`, `AS`, `EU`, `NA`, `OC`, and
+`SA`. A custom provider that cannot supply continent data may leave both fields
+empty. Continent is geographic data only; this package does not derive,
+recommend, or select a currency from it. The caller obtains `$trustedClientIp`
+at its host boundary. The package trusts only its configured resolver and does
+not infer trusted-proxy behavior.
 
 If no IP is supplied, the default resolver reads only `REMOTE_ADDR`. It ignores
 `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, and every other forwarding header.
@@ -117,16 +128,19 @@ wildcards if fuzzy matching is deliberately retained.
 
 `MaxMindService` accepts the narrow `MaxMindReaderInterface`; use
 `fromDatabase()` when `geoip2/geoip2` is installed. Capability, path readability,
-record shape, and coordinate ranges are validated. Raw MaxMind exceptions and
+record shape, and coordinate ranges are validated. Continent name and code are
+read from the MaxMind continent object when present and otherwise left empty;
+the adapter does not infer continent from country. Raw MaxMind exceptions and
 database paths are not copied into public errors.
 
 ## Legacy `Location` adapter
 
 `TimeFrontiers\Location` and `refresh()` remain deprecated migration adapters.
 Construction no longer performs a lookup. Every public property starts with a
-safe value, and `refresh()` assigns a complete validated snapshot only after
-lookup and enrichment succeed. Failure preserves the previous snapshot and
-records only a safe message with blank file/line fields.
+safe value, including `continent` and `continent_code`, and `refresh()` assigns
+a complete validated snapshot only after lookup and enrichment succeed. Failure
+preserves the previous snapshot, including continent, and records only a safe
+message with blank file/line fields.
 
 ```php
 $legacy = new \TimeFrontiers\Location('8.8.8.8', $provider);
@@ -141,6 +155,8 @@ Prefer `LocationLookup::locate()` and immutable `LocationData` in new code.
 `CurrencySymbols::get()` normalizes a code to uppercase and returns a
 display-only symbol hint. Unknown codes return the normalized code. It is not an
 ISO currency authority and must not decide settlement currency or money rules.
+Existing `currency_code` and `currency_symbol` fields remain for compatibility;
+consumers that need currency policy must apply their own configured mapping.
 
 ## Privacy and retention
 

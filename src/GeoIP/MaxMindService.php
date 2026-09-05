@@ -27,7 +27,9 @@ final readonly class MaxMindService implements GeoIPInterface {
         currency_code: '',
         currency_symbol: '',
         latitude: self::nestedFloat($record, ['location', 'latitude']),
-        longitude: self::nestedFloat($record, ['location', 'longitude'])
+        longitude: self::nestedFloat($record, ['location', 'longitude']),
+        continent: self::nestedString($record, ['continent', 'name']),
+        continent_code: self::nestedString($record, ['continent', 'code'])
       );
     } catch (LocationException $error) {
       throw $error;
